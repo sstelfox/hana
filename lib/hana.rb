@@ -1,38 +1,62 @@
 module Hana
   VERSION = '1.2.1'
 
-  class Pointer
-    include Enumerable
-
-    def initialize path
-      @path = Pointer.parse path
-    end
-
-    def each(&block); @path.each(&block); end
-
-    def eval object
-      Pointer.eval @path, object
-    end
-
-    ESC = {'^/' => '/', '^^' => '^', '~0' => '~', '~1' => '/'} # :nodoc:
-
-    def self.eval list, object
-      list.inject(object) { |o, part|
-        if Array === o
-          raise Patch::IndexError unless part =~ /\A\d+\Z/
-          part = part.to_i
+  # This module contains the code to convert between an JSON pointer path
+  # representation and the keys required to traverse an array. It can make use
+  # of an a path and evaluate it against a provided (potentially deeply nested)
+  # array or hash.
+  #
+  # This is mostly compliant with RFC6901, however, a few small exceptions have
+  # been made, though they shouldn't break compatibility with pure
+  # implementations.
+  module Pointer
+    # Given a parsed path and an Object
+    def eval(path, obj)
+      path.inject(obj) do |o, p|
+        if o.is_a?(Hash)
+          raise Patch::MissingTargetException unless o.keys.include?(p)
+          o[p]
+        elsif o.is_a?(Array)
+          # The last element +1 is technically how this is interpretted. This
+          # will always trigger the index error so it may not be valuable to
+          # set...
+          p = o.size if p == "-1"
+          # Technically a violation of the RFC to allow reverse access to the
+          # array but I'll allow it...
+          raise Patch::ObjectOperationOnArrayException unless p.to_s.match(/\A-?\d+\Z/)
+          raise IndexError unless p.to_i.abs < o.size
+          o[p.to_i]
+        else
+          # We received a Scalar value from the prior iteration... we can't do
+          # anything with this...
+          raise Patch::MissingTargetException
         end
-        o[part]
-      }
+      end
     end
 
-    def self.parse path
-      return [''] if path == '/'
-
-      path.sub(/^\//, '').split(/(?<!\^)\//).each { |part|
-        part.gsub!(/\^[\/^]|~[01]/) { |m| ESC[m] }
-      }
+    def encode(ary_path)
+      ary_path = Array(ary_path).map { |p| p.is_a?(String) ? escape(p) : p }
+      "/" << ary_path.join("/")
     end
+
+    def escape(str)
+      conv = { '~' => '~0', '/' => '~1' }
+      str.gsub(/~|\//) { |m| conv[m] }
+    end
+
+    def parse(path)
+      return [""] if path == "/"
+      # Strip off the leading slash
+      path = path.sub(/^\//, '')
+      path.split("/").map { |p| unescape(p) }
+    end
+
+    def unescape(str)
+      conv = { '~0' => '~', '~1' => '/' }
+      str.gsub(/~[01]/) { |m| conv[m] }
+    end
+
+    module_function :eval, :encode, :escape, :parse, :unescape
   end
 
   class Patch
@@ -128,7 +152,7 @@ module Hana
     end
 
     def test ins, doc
-      expected = Pointer.new(ins[PATH]).eval doc
+      expected = Pointer.eval(Pointer.parse(ins[PATH]), doc)
 
       unless expected == ins[VALUE]
         raise FailedTestException.new(ins[VALUE], ins[PATH])
@@ -136,9 +160,9 @@ module Hana
     end
 
     def replace ins, doc
-      list = Pointer.parse ins[PATH]
+      list = Pointer.parse(ins[PATH])
       key  = list.pop
-      obj  = Pointer.eval list, doc
+      obj  = Pointer.eval(list, doc)
 
       if Array === obj
         raise Patch::IndexError unless key =~ /\A\d+\Z/
