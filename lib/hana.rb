@@ -59,14 +59,14 @@ module Hana
     module_function :eval, :encode, :escape, :parse, :unescape
   end
 
-  HanaException = Class.new(StandardError)
+  Exception = Class.new(StandardError)
 
-  OutOfBoundsException = Class.new(HanaException)
-  ObjectOperationOnArrayException = Class.new(HanaException)
-  IndexError = Class.new(HanaException)
-  MissingTargetException = Class.new(HanaException)
+  OutOfBoundsException = Class.new(Hana::Exception)
+  ObjectOperationOnArrayException = Class.new(Hana::Exception)
+  IndexError = Class.new(Hana::Exception)
+  MissingTargetException = Class.new(Hana::Exception)
 
-  class FailedTestException < HanaException
+  class FailedTestException < Hana::Exception
     attr_accessor :path, :value
 
     def initialize(path, value)
@@ -84,7 +84,7 @@ module Hana
     def apply doc
       @is.each_with_object(doc) { |ins, d|
         send VALID.fetch(ins[OP].strip) { |k|
-          raise HanaException, "bad method `#{k}`"
+          raise Hana::Exception, "bad method `#{k}`"
         }, ins, d
       }
     end

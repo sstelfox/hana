@@ -5,7 +5,7 @@ class TestHana < Hana::TestCase
     patch = Hana::Patch.new [
       { 'op' => 'eval', 'value' => '1' }
     ]
-    assert_raises(Hana::HanaException) do
+    assert_raises(Hana::Exception) do
       patch.apply('foo' => 'bar')
     end
   end
