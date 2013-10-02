@@ -19,6 +19,11 @@
       "patch": [{"op": "replace", "path": "/1e0", "value": false}],
       "error": "replace op shouldn't replace in array with bad number" },
 
+    { "comment": "test deeply nested remove",
+      "doc": {"deeply": {"nested": {"document": 9}}},
+      "patch": [{"op": "replace", "path": "/deeply/nested/document", "value": 5}],
+      "expected": {"deeply": {"nested": {"document": 5}}} },
+
     { "comment": "test copy with bad number should fail",
       "doc": {"baz": [1,2,3], "bar": 1},
       "patch": [{"op": "copy", "from": "/baz/1e0", "path": "/boo"}],

@@ -28,6 +28,12 @@ class TestHana < Hana::TestCase
     assert_equal 'baz', Hana::Pointer.eval(pointer, 'foo' => { 'bar' => 'baz' })
   end
 
+  def test_deep_nest
+    pointer = Hana::Pointer.parse('/deep/nest/hash')
+    sample_doc = {'deep' => {'nest' => {'hash' => 3}}}
+    assert_equal 3, Hana::Pointer.eval(pointer, sample_doc)
+  end
+
   def test_eval_array
     pointer = Hana::Pointer.parse('/foo/1')
     assert_equal 'baz', Hana::Pointer.eval(pointer, 'foo' => ['bar', 'baz'])

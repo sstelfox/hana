@@ -1,6 +1,8 @@
 module Hana
   VERSION = '1.2.1'
+end
 
+module Hana
   # This module contains the code to convert between an JSON pointer path
   # representation and the keys required to traverse an array. It can make use
   # of an a path and evaluate it against a provided (potentially deeply nested)
@@ -10,7 +12,7 @@ module Hana
   # been made, though they shouldn't break compatibility with pure
   # implementations.
   module Pointer
-    # Given a parsed path and an Object
+    # Given a parsed path and an object, get the nested value within the object.
     def eval(path, obj)
       path.inject(obj) do |o, p|
         if o.is_a?(Hash)
@@ -58,7 +60,9 @@ module Hana
 
     module_function :eval, :encode, :escape, :parse, :unescape
   end
+end
 
+module Hana
   Exception = Class.new(StandardError)
 
   OutOfBoundsException = Class.new(Hana::Exception)
@@ -73,7 +77,9 @@ module Hana
       super "expected #{value} at #{path}"
     end
   end
+end
 
+module Hana
   class Patch
     def initialize is
       @is = is
