@@ -153,12 +153,12 @@ end
 
 module Hana::Operations::Move
   def apply(ins, doc)
-    from     = Hana::Pointer.parse ins['from']
-    to       = Hana::Pointer.parse ins['path']
+    from     = Hana::Pointer.parse(ins['from'])
+    to       = Hana::Pointer.parse(ins['path'])
     from_key = from.pop
     key      = to.pop
-    src      = Hana::Pointer.eval from, doc
-    dest     = Hana::Pointer.eval to, doc
+    src      = Hana::Pointer.eval(from, doc)
+    dest     = Hana::Pointer.eval(to, doc)
 
     obj = Hana::Operations.rm_op(src, from_key)
     Hana::Operations.add_op(dest, key, obj)
@@ -169,21 +169,21 @@ end
 
 module Hana::Operations::Copy
   def apply(ins, doc)
-    from     = Hana::Pointer.parse ins['from']
-    to       = Hana::Pointer.parse ins['path']
+    from     = Hana::Pointer.parse(ins['from'])
+    to       = Hana::Pointer.parse(ins['path'])
     from_key = from.pop
     key      = to.pop
-    src      = Hana::Pointer.eval from, doc
-    dest     = Hana::Pointer.eval to, doc
+    src      = Hana::Pointer.eval(from, doc)
+    dest     = Hana::Pointer.eval(to, doc)
 
-    if Array === src
+    if src.is_a?(Array)
       raise Hana::IndexError unless from_key =~ /\A\d+\Z/
-      obj = src.fetch from_key.to_i
+      obj = src.fetch(from_key.to_i)
     else
-      obj = src.fetch from_key
+      obj = src.fetch(from_key)
     end
 
-    Hana::Operations.add_op dest, key, obj
+    Hana::Operations.add_op(dest, key, obj)
   end
 
   module_function :apply
