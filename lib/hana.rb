@@ -104,25 +104,27 @@ module Hana
     attr_accessor :path, :value
 
     def initialize(path, value)
-      super "expected #{value} at #{path}"
+      super("Expected #{value} at #{path}")
     end
   end
 end
 
 module Hana
   class Patch
-    def initialize is
-      @is = is
+    VALID_OPERATIONS = %w{ add move test replace remove copy } # :nodoc:
+
+    def initialize(patch_operations)
+      @patch_operations = patch_operations
     end
 
-    VALID = Hash[%w{ add move test replace remove copy }.map { |x| [x,x]}] # :nodoc:
+    def apply(doc)
+      @patch_operations.each_with_object(doc) do |patch, cur_doc|
+        unless VALID_OPERATIONS.include?(patch['op'])
+          raise Hana::Exception, "bad method `#{patch['op']}`" 
+        end
 
-    def apply doc
-      @is.each_with_object(doc) { |ins, d|
-        send VALID.fetch(ins[OP].strip) { |k|
-          raise Hana::Exception, "bad method `#{k}`"
-        }, ins, d
-      }
+        send(patch['op'], patch, cur_doc)
+      end
     end
 
     private
