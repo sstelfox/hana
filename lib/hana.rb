@@ -119,89 +119,141 @@ module Hana
 
     def apply(doc)
       @patch_operations.each_with_object(doc) do |patch, cur_doc|
-        unless VALID_OPERATIONS.include?(patch['op'])
+        op_const = patch['op'].capitalize.to_sym
+
+        unless Hana::Operations.const_defined?(op_const)
           raise Hana::Exception, "bad method `#{patch['op']}`" 
         end
 
-        send(patch['op'], patch, cur_doc)
+        Hana::Operations.const_get(op_const).apply(patch, cur_doc)
       end
     end
+  end
+end
 
-    private
+module Hana
+  module Operations
+    module Add
+      def apply(patch_info, doc)
+        path      = Pointer.parse(patch_info['path'])
+        key       = path.pop
+        dest_obj  = Pointer.eval(path, doc)
+        new_value = patch_info['value']
 
-    def add(patch_info, doc)
-      path = Pointer.parse(patch_info['path'])
-      key  = path.pop
-      dest_obj = Pointer.eval(path, doc)
-      new_value  = patch_info['value']
+        raise(MissingTargetException, patch_info['path']) unless dest_obj
 
-      raise(MissingTargetException, patch_info['path']) unless dest_obj
-
-      if key
-        add_op(dest_obj, key, new_value)
-      else
-        dest_obj.replace(new_value)
-      end
-    end
-
-    def move ins, doc
-      from     = Pointer.parse ins['from']
-      to       = Pointer.parse ins['path']
-      from_key = from.pop
-      key      = to.pop
-      src      = Pointer.eval from, doc
-      dest     = Pointer.eval to, doc
-
-      obj = rm_op src, from_key
-      add_op dest, key, obj
-    end
-
-    def copy ins, doc
-      from     = Pointer.parse ins['from']
-      to       = Pointer.parse ins['path']
-      from_key = from.pop
-      key      = to.pop
-      src      = Pointer.eval from, doc
-      dest     = Pointer.eval to, doc
-
-      if Array === src
-        raise IndexError unless from_key =~ /\A\d+\Z/
-        obj = src.fetch from_key.to_i
-      else
-        obj = src.fetch from_key
+        if key
+          Operations.add_op(dest_obj, key, new_value)
+        else
+          dest_obj.replace(new_value)
+        end
       end
 
-      add_op dest, key, obj
+      module_function :apply
     end
+  end
+end
 
-    def test ins, doc
-      expected = Pointer.eval(Pointer.parse(ins['path']), doc)
+module Hana
+  module Operations
+    module Move
+      def apply(ins, doc)
+        from     = Pointer.parse ins['from']
+        to       = Pointer.parse ins['path']
+        from_key = from.pop
+        key      = to.pop
+        src      = Pointer.eval from, doc
+        dest     = Pointer.eval to, doc
 
-      unless expected == ins['value']
-        raise FailedTestException.new(ins['value'], ins['path'])
+        obj = Operations.rm_op(src, from_key)
+        Operations.add_op(dest, key, obj)
       end
+
+      module_function :apply
     end
+  end
+end
 
-    def replace(ins, doc)
-      list = Pointer.parse(ins['path'])
-      key  = list.pop
-      obj  = Pointer.eval(list, doc)
+module Hana
+  module Operations
+    module Copy
+      def apply(ins, doc)
+        from     = Pointer.parse ins['from']
+        to       = Pointer.parse ins['path']
+        from_key = from.pop
+        key      = to.pop
+        src      = Pointer.eval from, doc
+        dest     = Pointer.eval to, doc
 
-      if Array === obj
-        raise IndexError unless key =~ /\A\d+\Z/
-        obj[key.to_i] = ins['value']
-      else
-        obj[key] = ins['value']
+        if Array === src
+          raise IndexError unless from_key =~ /\A\d+\Z/
+          obj = src.fetch from_key.to_i
+        else
+          obj = src.fetch from_key
+        end
+
+        Operations.add_op dest, key, obj
       end
-    end
 
-    def remove ins, doc
-      list = Pointer.parse ins['path']
-      key  = list.pop
-      obj  = Pointer.eval list, doc
-      rm_op obj, key
+      module_function :apply
     end
+  end
+end
 
+module Hana
+  module Operations
+    module Test
+      def apply(ins, doc)
+        expected = Pointer.eval(Pointer.parse(ins['path']), doc)
+
+        unless expected == ins['value']
+          raise FailedTestException.new(ins['value'], ins['path'])
+        end
+      end
+
+      module_function :apply
+    end
+  end
+end
+
+module Hana
+  module Operations
+    module Replace
+      def apply(ins, doc)
+        list = Pointer.parse(ins['path'])
+        key  = list.pop
+        obj  = Pointer.eval(list, doc)
+
+        if Array === obj
+          raise IndexError unless key =~ /\A\d+\Z/
+          obj[key.to_i] = ins['value']
+        else
+          obj[key] = ins['value']
+        end
+      end
+
+      module_function :apply
+    end
+  end
+end
+
+module Hana
+  module Operations
+    module Remove
+      def apply(ins, doc)
+        list = Pointer.parse(ins['path'])
+        key  = list.pop
+        obj  = Pointer.eval(list, doc)
+        Operations.rm_op(obj, key)
+      end
+
+      module_function :apply
+    end
+  end
+end
+
+module Hana
+  module Operations
     def check_index obj, key
       return -1 if key == '-'
 
@@ -219,13 +271,16 @@ module Hana
       end
     end
 
-    def rm_op obj, key
-      if Array === obj
+    def rm_op(obj, key)
+      if obj.is_a?(Array)
         raise IndexError unless key =~ /\A\d+\Z/
-        obj.delete_at key.to_i
+        obj.delete_at(key.to_i)
       else
-        obj.delete key
+        obj.delete(key)
       end
     end
+
+    module_function :check_index, :add_op, :rm_op
   end
 end
+
