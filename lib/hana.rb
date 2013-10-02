@@ -110,69 +110,61 @@ module Hana
   end
 end
 
-module Hana
-  class Patch
-    VALID_OPERATIONS = %w{ add move test replace remove copy } # :nodoc:
+class Hana::Patch
+  def initialize(patch_operations)
+    @patch_operations = patch_operations
+  end
 
-    def initialize(patch_operations)
-      @patch_operations = patch_operations
-    end
+  def apply(doc)
+    @patch_operations.each_with_object(doc) do |patch, cur_doc|
+      op_const = patch['op'].capitalize.to_sym
 
-    def apply(doc)
-      @patch_operations.each_with_object(doc) do |patch, cur_doc|
-        op_const = patch['op'].capitalize.to_sym
-
-        unless Hana::Operations.const_defined?(op_const)
-          raise Hana::InvalidOperation, "Invalid operation: `#{patch['op']}`" 
-        end
-
-        Hana::Operations.const_get(op_const).apply(patch, cur_doc)
+      unless Hana::Operations.const_defined?(op_const)
+        raise Hana::InvalidOperation, "Invalid operation: `#{patch['op']}`" 
       end
+
+      Hana::Operations.const_get(op_const).apply(patch, cur_doc)
     end
   end
 end
 
-module Hana
-  module Operations
-    module Add
-      def apply(patch_info, doc)
-        path      = Pointer.parse(patch_info['path'])
-        key       = path.pop
-        dest_obj  = Pointer.eval(path, doc)
-        new_value = patch_info['value']
-
-        raise(MissingTargetException, patch_info['path']) unless dest_obj
-
-        if key
-          Operations.add_op(dest_obj, key, new_value)
-        else
-          dest_obj.replace(new_value)
-        end
-      end
-
-      module_function :apply
-    end
-  end
+# Placeholder
+module Hana::Operations # :nodoc:
 end
 
-module Hana
-  module Operations
-    module Move
-      def apply(ins, doc)
-        from     = Pointer.parse ins['from']
-        to       = Pointer.parse ins['path']
-        from_key = from.pop
-        key      = to.pop
-        src      = Pointer.eval from, doc
-        dest     = Pointer.eval to, doc
+module Hana::Operations::Add
+  def apply(patch_info, doc)
+    path      = Hana::Pointer.parse(patch_info['path'])
+    key       = path.pop
+    dest_obj  = Hana::Pointer.eval(path, doc)
+    new_value = patch_info['value']
 
-        obj = Operations.rm_op(src, from_key)
-        Operations.add_op(dest, key, obj)
-      end
+    raise(MissingTargetException, patch_info['path']) unless dest_obj
 
-      module_function :apply
+    if key
+      Hana::Operations.add_op(dest_obj, key, new_value)
+    else
+      dest_obj.replace(new_value)
     end
   end
+
+  module_function :apply
+end
+
+module Hana::Operations::Move
+  def apply(ins, doc)
+    from     = Hana::Pointer.parse ins['from']
+    to       = Hana::Pointer.parse ins['path']
+    from_key = from.pop
+    key      = to.pop
+    src      = Hana::Pointer.eval from, doc
+    dest     = Hana::Pointer.eval to, doc
+
+    obj = Hana::Operations.rm_op(src, from_key)
+    Hana::Operations.add_op(dest, key, obj)
+  end
+
+  module_function :apply
 end
 
 module Hana
@@ -256,19 +248,22 @@ end
 module Hana
   module Operations
     def check_index(obj, key)
-      return -1 if key == '-'
-
       raise ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
       idx = key.to_i
       raise OutOfBoundsException if (idx > obj.size || idx < 0)
       idx
     end
 
-    def add_op(dest, key, obj)
-      if dest.is_a?(Array)
-        dest.insert check_index(dest, key), obj
+    # Add an item with
+    def add_op(dest_obj, key, new_value)
+      if dest_obj.is_a?(Array)
+        if key == '-'
+          dest_obj.insert(-1, new_value)
+        else
+          dest_obj.insert(check_index(dest_obj, key), new_value)
+        end
       else
-        dest[key] = obj
+        dest_obj[key] = new_value
       end
     end
 
