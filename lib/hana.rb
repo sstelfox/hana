@@ -136,30 +136,57 @@ module Hana::Operations
   # Add a value at the provided key within the provided object. This will behave
   # differently depending on whether we're processing a hash or an array as the
   # target destination.
-  def add_op(dest_obj, key, new_value)
-    if dest_obj.is_a?(Array)
-      dest_obj.insert(check_array_index(key, dest_obj.size), new_value)
+  #
+  # It is important to note that this behaves by adjusting the state of the
+  # provided object. It does not return the new object itself!
+  #
+  # @param [Array, Hash] target_obj The object that will have the value added.
+  # @param [Fixnum,String] key The index / key where the new value will be
+  #   inserted.
+  # @param [Object] new_value The value to insert at the specified location.
+  # @return [void]
+  def add_op(target_obj, key, new_value)
+    if target_obj.is_a?(Array)
+      target_obj.insert(check_array_index(key, target_obj.size), new_value)
     else
-      dest_obj[key] = new_value
+      target_obj[key] = new_value
     end
   end
 
+  # Validates that the array index provided falls within the acceptable range or
+  # in the event we have received the special '-' index defined in the JSON
+  # Pointer RFC we treat it as the last element.
+  #
+  # @param [String,Fixnum] index The index value to validate
+  # @param [Fixnum] array_size The size of the array this index will be used
+  #   within (Used for bounds checking).
+  # @return [Fixnum] Valid index
   def check_array_index(index, array_size)
     return -1 if index == "-"
     raise Hana::ObjectOperationOnArrayException unless index =~ /\A-?\d+\Z/
+
     index = index.to_i
+
     # There is a bug in the IETF tests that require us to allow patches to set a
     # value at the end of the array. The final '<=' should actually be a '<'.
     raise Hana::OutOfBoundsException unless (0 <= index && index <= array_size)
+
     index
   end
 
-  def rm_op(obj, key)
-    if obj.is_a?(Array)
+  # Remove a hash key or index from the provided object.
+  #
+  # It is important to note that this behaves by adjusting the state of the
+  # provided object. It does not return the new object itself!
+  #
+  # @param [Array, Hash] target_obj The object that will have the value removed.
+  def rm_op(target_obj, key)
+    if target_obj.is_a?(Array)
       raise Hana::IndexError unless key =~ /\A\d+\Z/
-      obj.delete_at(key.to_i)
+      target_obj.delete_at(check_array_index(key, target_obj.size))
     else
-      obj.delete(key)
+      raise(MissingTargetException, key) unless target_obj.has_key?(key)
+      target_obj.delete(key)
     end
   end
 
