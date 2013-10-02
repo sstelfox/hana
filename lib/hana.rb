@@ -1,3 +1,4 @@
+
 module Hana
   VERSION = '1.2.1'
 end
@@ -13,6 +14,10 @@ module Hana
   # implementations.
   module Pointer
     # Given a parsed path and an object, get the nested value within the object.
+    #
+    # @param [Array<String,Fixnum>] path Key path to traverse to get the value.
+    # @param [Hash,Array] obj The document to traverse.
+    # @return [Object] The value at the provided path.
     def eval(path, obj)
       path.inject(obj) do |o, p|
         if o.is_a?(Hash)
@@ -36,23 +41,48 @@ module Hana
       end
     end
 
+    # Given an array of keys this will provide a properly escaped JSONPointer
+    # path.
+    #
+    # @param [Array<String,Fixnum>] ary_path
+    # @return [String]
     def encode(ary_path)
       ary_path = Array(ary_path).map { |p| p.is_a?(String) ? escape(p) : p }
       "/" << ary_path.join("/")
     end
 
+    # Escapes reserved characters as defined by RFC6901. This is intended to
+    # escape individual segments of the pointer and thus should not be run on an
+    # already generated path.
+    #
+    # @see [Pointer#unescape]
+    # @param [String] str
+    # @return [String]
     def escape(str)
       conv = { '~' => '~0', '/' => '~1' }
       str.gsub(/~|\//) { |m| conv[m] }
     end
 
+    # Convert a JSON pointer into an array of keys that can be used to traverse
+    # a parsed JSON document.
+    #
+    # @param [String] path
+    # @return [Array<String,Fixnum>]
     def parse(path)
+      # I'm pretty sure this isn't quite valid but it's a holdover from
+      # tenderlove's code. Once the operations are refactored I believe this
+      # won't be necessary.
       return [""] if path == "/"
       # Strip off the leading slash
       path = path.sub(/^\//, '')
       path.split("/").map { |p| unescape(p) }
     end
 
+    # Unescapes any reserved characters within a JSON pointer segment.
+    #
+    # @see [Pointer#escape]
+    # @param [String]
+    # @return [String]
     def unescape(str)
       conv = { '~0' => '~', '~1' => '/' }
       str.gsub(/~[01]/) { |m| conv[m] }
