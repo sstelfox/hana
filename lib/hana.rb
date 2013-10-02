@@ -14,7 +14,7 @@ module Hana
     def eval(path, obj)
       path.inject(obj) do |o, p|
         if o.is_a?(Hash)
-          raise Patch::MissingTargetException unless o.keys.include?(p)
+          raise MissingTargetException unless o.keys.include?(p)
           o[p]
         elsif o.is_a?(Array)
           # The last element +1 is technically how this is interpretted. This
@@ -23,13 +23,13 @@ module Hana
           p = o.size if p == "-1"
           # Technically a violation of the RFC to allow reverse access to the
           # array but I'll allow it...
-          raise Patch::ObjectOperationOnArrayException unless p.to_s.match(/\A-?\d+\Z/)
+          raise ObjectOperationOnArrayException unless p.to_s.match(/\A-?\d+\Z/)
           raise IndexError unless p.to_i.abs < o.size
           o[p.to_i]
         else
           # We received a Scalar value from the prior iteration... we can't do
           # anything with this...
-          raise Patch::MissingTargetException
+          raise MissingTargetException
         end
       end
     end
@@ -59,32 +59,32 @@ module Hana
     module_function :eval, :encode, :escape, :parse, :unescape
   end
 
+  class HanaException < StandardError
+  end
+
+  class FailedTestException < HanaException
+    attr_accessor :path, :value
+
+    def initialize path, value
+      super "expected #{value} at #{path}"
+      @path  = path
+      @value = value
+    end
+  end
+
+  class OutOfBoundsException < HanaException
+  end
+
+  class ObjectOperationOnArrayException < HanaException
+  end
+
+  class IndexError < HanaException
+  end
+
+  class MissingTargetException < HanaException
+  end
+
   class Patch
-    class Exception < StandardError
-    end
-
-    class FailedTestException < Exception
-      attr_accessor :path, :value
-
-      def initialize path, value
-        super "expected #{value} at #{path}"
-        @path  = path
-        @value = value
-      end
-    end
-
-    class OutOfBoundsException < Exception
-    end
-
-    class ObjectOperationOnArrayException < Exception
-    end
-
-    class IndexError < Exception
-    end
-
-    class MissingTargetException < Exception
-    end
-
     def initialize is
       @is = is
     end
@@ -94,7 +94,7 @@ module Hana
     def apply doc
       @is.each_with_object(doc) { |ins, d|
         send VALID.fetch(ins[OP].strip) { |k|
-          raise Exception, "bad method `#{k}`"
+          raise HanaException, "bad method `#{k}`"
         }, ins, d
       }
     end
@@ -142,7 +142,7 @@ module Hana
       dest     = Pointer.eval to, doc
 
       if Array === src
-        raise Patch::IndexError unless from_key =~ /\A\d+\Z/
+        raise IndexError unless from_key =~ /\A\d+\Z/
         obj = src.fetch from_key.to_i
       else
         obj = src.fetch from_key
@@ -165,7 +165,7 @@ module Hana
       obj  = Pointer.eval(list, doc)
 
       if Array === obj
-        raise Patch::IndexError unless key =~ /\A\d+\Z/
+        raise IndexError unless key =~ /\A\d+\Z/
         obj[key.to_i] = ins[VALUE]
       else
         obj[key] = ins[VALUE]
@@ -198,7 +198,7 @@ module Hana
 
     def rm_op obj, key
       if Array === obj
-        raise Patch::IndexError unless key =~ /\A\d+\Z/
+        raise IndexError unless key =~ /\A\d+\Z/
         obj.delete_at key.to_i
       else
         obj.delete key

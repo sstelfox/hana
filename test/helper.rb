@@ -42,17 +42,17 @@ module Hana
 
     def ex msg
       case msg
-      when /Out of bounds/i then [Hana::Patch::OutOfBoundsException]
+      when /Out of bounds/i then [Hana::OutOfBoundsException]
       when /Object operation on array/ then
-        [Hana::Patch::ObjectOperationOnArrayException]
+        [Hana::ObjectOperationOnArrayException]
       when /test op shouldn't get array element/ then
-        [Hana::Patch::IndexError, Hana::Patch::ObjectOperationOnArrayException]
+        [Hana::IndexError, Hana::ObjectOperationOnArrayException]
       when /bad number$/ then
-        [Hana::Patch::IndexError, Hana::Patch::ObjectOperationOnArrayException]
+        [Hana::IndexError, Hana::ObjectOperationOnArrayException]
       when /missing|non-existant/ then
-        [Hana::Patch::MissingTargetException]
+        [Hana::MissingTargetException]
       else
-        [Hana::Patch::FailedTestException]
+        [Hana::FailedTestException]
       end
     end
   end
