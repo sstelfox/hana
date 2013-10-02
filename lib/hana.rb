@@ -255,17 +255,17 @@ end
 
 module Hana
   module Operations
-    def check_index obj, key
+    def check_index(obj, key)
       return -1 if key == '-'
 
       raise ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
       idx = key.to_i
-      raise OutOfBoundsException if idx > obj.length || idx < 0
+      raise OutOfBoundsException if (idx > obj.size || idx < 0)
       idx
     end
 
-    def add_op dest, key, obj
-      if Array === dest
+    def add_op(dest, key, obj)
+      if dest.is_a?(Array)
         dest.insert check_index(dest, key), obj
       else
         dest[key] = obj
