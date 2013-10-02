@@ -138,17 +138,20 @@ module Hana::Operations
   # target destination.
   def add_op(dest_obj, key, new_value)
     if dest_obj.is_a?(Array)
-      if key == '-'
-        dest_obj.insert(-1, new_value)
-      else
-        raise Hana::ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
-        key = key.to_i
-        raise Hana::OutOfBoundsException if (key > dest_obj.size || key < 0)
-        dest_obj.insert(key, new_value)
-      end
+      dest_obj.insert(check_array_index(key, dest_obj.size), new_value)
     else
       dest_obj[key] = new_value
     end
+  end
+
+  def check_array_index(index, array_size)
+    return -1 if index == "-"
+    raise Hana::ObjectOperationOnArrayException unless index =~ /\A-?\d+\Z/
+    index = index.to_i
+    # There is a bug in the IETF tests that require us to allow patches to set a
+    # value at the end of the array. The final '<=' should actually be a '<'.
+    raise Hana::OutOfBoundsException unless (0 <= index && index <= array_size)
+    index
   end
 
   def rm_op(obj, key)
@@ -160,7 +163,7 @@ module Hana::Operations
     end
   end
 
-  module_function :add_op, :rm_op
+  module_function :add_op, :check_array_index, :rm_op
 end
 
 module Hana::Operations::Add
