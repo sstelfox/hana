@@ -129,11 +129,6 @@ module Hana
 
     private
 
-    PATH  = 'path' # :nodoc:
-    FROM  = 'from' # :nodoc:
-    VALUE = 'value' # :nodoc:
-    OP    = 'op' # :nodoc:
-
     def add(patch_info, doc)
       path = Pointer.parse(patch_info['path'])
       key  = path.pop
@@ -150,8 +145,8 @@ module Hana
     end
 
     def move ins, doc
-      from     = Pointer.parse ins[FROM]
-      to       = Pointer.parse ins[PATH]
+      from     = Pointer.parse ins['from']
+      to       = Pointer.parse ins['path']
       from_key = from.pop
       key      = to.pop
       src      = Pointer.eval from, doc
@@ -162,8 +157,8 @@ module Hana
     end
 
     def copy ins, doc
-      from     = Pointer.parse ins[FROM]
-      to       = Pointer.parse ins[PATH]
+      from     = Pointer.parse ins['from']
+      to       = Pointer.parse ins['path']
       from_key = from.pop
       key      = to.pop
       src      = Pointer.eval from, doc
@@ -180,28 +175,28 @@ module Hana
     end
 
     def test ins, doc
-      expected = Pointer.eval(Pointer.parse(ins[PATH]), doc)
+      expected = Pointer.eval(Pointer.parse(ins['path']), doc)
 
-      unless expected == ins[VALUE]
-        raise FailedTestException.new(ins[VALUE], ins[PATH])
+      unless expected == ins['value']
+        raise FailedTestException.new(ins['value'], ins['path'])
       end
     end
 
     def replace(ins, doc)
-      list = Pointer.parse(ins[PATH])
+      list = Pointer.parse(ins['path'])
       key  = list.pop
       obj  = Pointer.eval(list, doc)
 
       if Array === obj
         raise IndexError unless key =~ /\A\d+\Z/
-        obj[key.to_i] = ins[VALUE]
+        obj[key.to_i] = ins['value']
       else
-        obj[key] = ins[VALUE]
+        obj[key] = ins['value']
       end
     end
 
     def remove ins, doc
-      list = Pointer.parse ins[PATH]
+      list = Pointer.parse ins['path']
       key  = list.pop
       obj  = Pointer.eval list, doc
       rm_op obj, key
