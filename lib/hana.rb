@@ -167,30 +167,26 @@ module Hana::Operations::Move
   module_function :apply
 end
 
-module Hana
-  module Operations
-    module Copy
-      def apply(ins, doc)
-        from     = Pointer.parse ins['from']
-        to       = Pointer.parse ins['path']
-        from_key = from.pop
-        key      = to.pop
-        src      = Pointer.eval from, doc
-        dest     = Pointer.eval to, doc
+module Hana::Operations::Copy
+  def apply(ins, doc)
+    from     = Hana::Pointer.parse ins['from']
+    to       = Hana::Pointer.parse ins['path']
+    from_key = from.pop
+    key      = to.pop
+    src      = Hana::Pointer.eval from, doc
+    dest     = Hana::Pointer.eval to, doc
 
-        if Array === src
-          raise IndexError unless from_key =~ /\A\d+\Z/
-          obj = src.fetch from_key.to_i
-        else
-          obj = src.fetch from_key
-        end
-
-        Operations.add_op dest, key, obj
-      end
-
-      module_function :apply
+    if Array === src
+      raise Hana::IndexError unless from_key =~ /\A\d+\Z/
+      obj = src.fetch from_key.to_i
+    else
+      obj = src.fetch from_key
     end
+
+    Hana::Operations.add_op dest, key, obj
   end
+
+  module_function :apply
 end
 
 module Hana
