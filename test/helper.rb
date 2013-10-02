@@ -46,9 +46,9 @@ module Hana
       when /Object operation on array/ then
         [Hana::ObjectOperationOnArrayException]
       when /test op shouldn't get array element/ then
-        [Hana::IndexError, Hana::ObjectOperationOnArrayException]
+        [Hana::InvalidIndexError, Hana::ObjectOperationOnArrayException]
       when /bad number$/ then
-        [Hana::IndexError, Hana::ObjectOperationOnArrayException]
+        [Hana::InvalidIndexError, Hana::ObjectOperationOnArrayException]
       when /missing|non-existant/ then
         [Hana::MissingTargetException]
       else

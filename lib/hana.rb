@@ -31,12 +31,12 @@ module Hana
           # Technically a violation of the RFC to allow reverse access to the
           # array but I'll allow it...
           raise ObjectOperationOnArrayException unless p.to_s.match(/\A-?\d+\Z/)
-          raise IndexError unless p.to_i.abs < o.size
+          raise InvalidIndexError unless p.to_i.abs < o.size
           o[p.to_i]
         else
           # We received a Scalar value from the prior iteration... we can't do
           # anything with this...
-          raise MissingTargetException
+          raise TraverseScalarException
         end
       end
     end
@@ -81,7 +81,7 @@ module Hana
     # Unescapes any reserved characters within a JSON pointer segment.
     #
     # @see [Pointer#escape]
-    # @param [String]
+    # @param [String] str
     # @return [String]
     def unescape(str)
       conv = { '~0' => '~', '~1' => '/' }
@@ -95,17 +95,19 @@ end
 module Hana
   Exception = Class.new(StandardError)
 
-  OutOfBoundsException            = Class.new(Hana::Exception)
-  ObjectOperationOnArrayException = Class.new(Hana::Exception)
-  IndexError                      = Class.new(Hana::Exception)
-  MissingTargetException          = Class.new(Hana::Exception)
-  InvalidOperation                = Class.new(Hana::Exception)
+  InvalidIndexError               = Class.new(Exception)
+  InvalidOperation                = Class.new(Exception)
+  MissingTargetException          = Class.new(Exception)
+  ObjectOperationOnArrayException = Class.new(Exception)
+  OutOfBoundsException            = Class.new(Exception)
+  TraverseScalarException         = Class.new(Exception)
 
-  class FailedTestException < Hana::Exception
+  class FailedTestException < Exception
     attr_accessor :path, :value
 
     def initialize(path, value)
       super("Expected #{value} at #{path}")
+      @path, @value = path, value
     end
   end
 end
@@ -190,7 +192,7 @@ module Hana::Operations
   # @param [Array, Hash] target_obj The object that will have the value removed.
   def rm_op(target_obj, key)
     if target_obj.is_a?(Array)
-      raise Hana::IndexError unless key =~ /\A\d+\Z/
+      raise Hana::InvalidIndexError unless key =~ /\A\d+\Z/
       target_obj.delete_at(check_array_index(key, target_obj.size))
     else
       raise(MissingTargetException, key) unless target_obj.has_key?(key)
@@ -222,6 +224,30 @@ class Hana::Operations::Add
   end
 end
 
+class Hana::Operations::Copy
+  def initialize(patch_data)
+    @patch_data = patch_data
+  end
+
+  def apply(target_doc)
+    from     = Hana::Pointer.parse(@patch_data['from'])
+    to       = Hana::Pointer.parse(@patch_data['path'])
+    from_key = from.pop
+    key      = to.pop
+    src      = Hana::Pointer.eval(from, target_doc)
+    dest     = Hana::Pointer.eval(to, target_doc)
+
+    if src.is_a?(Array)
+      raise Hana::InvalidIndexError unless from_key =~ /\A\d+\Z/
+      obj = src.fetch(from_key.to_i)
+    else
+      obj = src.fetch(from_key)
+    end
+
+    Hana::Operations.add_op(dest, key, obj)
+  end
+end
+
 class Hana::Operations::Move
   def initialize(patch_data)
     @patch_data = patch_data
@@ -240,27 +266,36 @@ class Hana::Operations::Move
   end
 end
 
-class Hana::Operations::Copy
+class Hana::Operations::Remove
   def initialize(patch_data)
     @patch_data = patch_data
   end
 
   def apply(target_doc)
-    from     = Hana::Pointer.parse(@patch_data['from'])
-    to       = Hana::Pointer.parse(@patch_data['path'])
-    from_key = from.pop
-    key      = to.pop
-    src      = Hana::Pointer.eval(from, target_doc)
-    dest     = Hana::Pointer.eval(to, target_doc)
+    list = Hana::Pointer.parse(@patch_data['path'])
+    key  = list.pop
+    obj  = Hana::Pointer.eval(list, target_doc)
 
-    if src.is_a?(Array)
-      raise Hana::IndexError unless from_key =~ /\A\d+\Z/
-      obj = src.fetch(from_key.to_i)
+    Hana::Operations.rm_op(obj, key)
+  end
+end
+
+class Hana::Operations::Replace
+  def initialize(patch_data)
+    @patch_data = patch_data
+  end
+
+  def apply(target_doc)
+    list = Hana::Pointer.parse(@patch_data['path'])
+    key  = list.pop
+    obj  = Hana::Pointer.eval(list, target_doc)
+
+    if obj.is_a?(Array)
+      raise Hana::InvalidIndexError unless key =~ /\A\d+\Z/
+      obj[key.to_i] = @patch_data['value']
     else
-      obj = src.fetch(from_key)
+      obj[key] = @patch_data['value']
     end
-
-    Hana::Operations.add_op(dest, key, obj)
   end
 end
 
@@ -277,39 +312,6 @@ class Hana::Operations::Test
     unless expected == @patch_data['value']
       raise Hana::FailedTestException.new(@patch_data['value'], @patch_data['path'])
     end
-  end
-end
-
-class Hana::Operations::Replace
-  def initialize(patch_data)
-    @patch_data = patch_data
-  end
-
-  def apply(target_doc)
-    list = Hana::Pointer.parse(@patch_data['path'])
-    key  = list.pop
-    obj  = Hana::Pointer.eval(list, target_doc)
-
-    if obj.is_a?(Array)
-      raise Hana::IndexError unless key =~ /\A\d+\Z/
-      obj[key.to_i] = @patch_data['value']
-    else
-      obj[key] = @patch_data['value']
-    end
-  end
-end
-
-class Hana::Operations::Remove
-  def initialize(patch_data)
-    @patch_data = patch_data
-  end
-
-  def apply(target_doc)
-    list = Hana::Pointer.parse(@patch_data['path'])
-    key  = list.pop
-    obj  = Hana::Pointer.eval(list, target_doc)
-
-    Hana::Operations.rm_op(obj, key)
   end
 end
 
