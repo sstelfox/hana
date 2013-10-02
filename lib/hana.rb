@@ -112,20 +112,28 @@ end
 
 class Hana::Patch
   def initialize(patch_operations)
-    @patch_operations = patch_operations
+    @patch_operations = patch_operations.map { |p| Hana::OperationFactory.build(p) }
   end
 
   def apply(doc)
     @patch_operations.each_with_object(doc) do |patch, cur_doc|
-      op_const = patch['op'].capitalize.to_sym
-
-      unless Hana::Operations.const_defined?(op_const)
-        raise Hana::InvalidOperation, "Invalid operation: `#{patch['op']}`" 
-      end
-
-      Hana::Operations.const_get(op_const).new(patch).apply(cur_doc)
+      patch.apply(cur_doc)
     end
   end
+end
+
+module Hana::OperationFactory
+  def build(patch)
+    op_const = patch['op'].capitalize.to_sym
+
+    unless Hana::Operations.const_defined?(op_const)
+      raise Hana::InvalidOperation, "Invalid operation: `#{patch['op']}`" 
+    end
+
+    Hana::Operations.const_get(op_const).new(patch)
+  end
+
+  module_function :build
 end
 
 # These operations take advantage of the fact that Pointer#eval returns the same

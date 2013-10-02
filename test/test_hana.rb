@@ -2,11 +2,8 @@ require 'helper'
 
 class TestHana < Hana::TestCase
   def test_no_eval
-    patch = Hana::Patch.new [
-      { 'op' => 'eval', 'value' => '1' }
-    ]
     assert_raises(Hana::InvalidOperation) do
-      patch.apply('foo' => 'bar')
+      Hana::OperationFactory.build({ 'op' => 'eval', 'value' => '1' })
     end
   end
 
