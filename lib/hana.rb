@@ -128,8 +128,33 @@ class Hana::Patch
   end
 end
 
-# Placeholder
-module Hana::Operations # :nodoc:
+module Hana::Operations
+  # Add an item with
+  def add_op(dest_obj, key, new_value)
+    if dest_obj.is_a?(Array)
+      if key == '-'
+        dest_obj.insert(-1, new_value)
+      else
+        raise Hana::ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
+        key = key.to_i
+        raise Hana::OutOfBoundsException if (key > dest_obj.size || key < 0)
+        dest_obj.insert(key, new_value)
+      end
+    else
+      dest_obj[key] = new_value
+    end
+  end
+
+  def rm_op(obj, key)
+    if obj.is_a?(Array)
+      raise Hana::IndexError unless key =~ /\A\d+\Z/
+      obj.delete_at(key.to_i)
+    else
+      obj.delete(key)
+    end
+  end
+
+  module_function :add_op, :rm_op
 end
 
 module Hana::Operations::Add
@@ -238,37 +263,6 @@ module Hana
 
       module_function :apply
     end
-  end
-end
-
-module Hana
-  module Operations
-    # Add an item with
-    def add_op(dest_obj, key, new_value)
-      if dest_obj.is_a?(Array)
-        if key == '-'
-          dest_obj.insert(-1, new_value)
-        else
-          raise ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
-          key = key.to_i
-          raise OutOfBoundsException if (key > dest_obj.size || key < 0)
-          dest_obj.insert(key, new_value)
-        end
-      else
-        dest_obj[key] = new_value
-      end
-    end
-
-    def rm_op(obj, key)
-      if obj.is_a?(Array)
-        raise IndexError unless key =~ /\A\d+\Z/
-        obj.delete_at(key.to_i)
-      else
-        obj.delete(key)
-      end
-    end
-
-    module_function :add_op, :rm_op
   end
 end
 
