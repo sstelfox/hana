@@ -59,29 +59,19 @@ module Hana
     module_function :eval, :encode, :escape, :parse, :unescape
   end
 
-  class HanaException < StandardError
-  end
+  HanaException = Class.new(StandardError)
+
+  OutOfBoundsException = Class.new(HanaException)
+  ObjectOperationOnArrayException = Class.new(HanaException)
+  IndexError = Class.new(HanaException)
+  MissingTargetException = Class.new(HanaException)
 
   class FailedTestException < HanaException
     attr_accessor :path, :value
 
-    def initialize path, value
+    def initialize(path, value)
       super "expected #{value} at #{path}"
-      @path  = path
-      @value = value
     end
-  end
-
-  class OutOfBoundsException < HanaException
-  end
-
-  class ObjectOperationOnArrayException < HanaException
-  end
-
-  class IndexError < HanaException
-  end
-
-  class MissingTargetException < HanaException
   end
 
   class Patch
@@ -106,18 +96,18 @@ module Hana
     VALUE = 'value' # :nodoc:
     OP    = 'op' # :nodoc:
 
-    def add ins, doc
-      list = Pointer.parse ins[PATH]
-      key  = list.pop
-      dest = Pointer.eval list, doc
-      obj  = ins[VALUE]
+    def add(patch_info, doc)
+      path = Pointer.parse(patch_info['path'])
+      key  = path.pop
+      dest_obj = Pointer.eval(path, doc)
+      new_value  = patch_info['value']
 
-      raise(MissingTargetException, ins[PATH]) unless dest
+      raise(MissingTargetException, patch_info['path']) unless dest_obj
 
       if key
-        add_op dest, key, obj
+        add_op(dest_obj, key, new_value)
       else
-        dest.replace obj
+        dest_obj.replace(new_value)
       end
     end
 
@@ -159,7 +149,7 @@ module Hana
       end
     end
 
-    def replace ins, doc
+    def replace(ins, doc)
       list = Pointer.parse(ins[PATH])
       key  = list.pop
       obj  = Pointer.eval(list, doc)
