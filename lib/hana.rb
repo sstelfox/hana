@@ -95,10 +95,11 @@ end
 module Hana
   Exception = Class.new(StandardError)
 
-  OutOfBoundsException = Class.new(Hana::Exception)
+  OutOfBoundsException            = Class.new(Hana::Exception)
   ObjectOperationOnArrayException = Class.new(Hana::Exception)
-  IndexError = Class.new(Hana::Exception)
-  MissingTargetException = Class.new(Hana::Exception)
+  IndexError                      = Class.new(Hana::Exception)
+  MissingTargetException          = Class.new(Hana::Exception)
+  InvalidOperation                = Class.new(Hana::Exception)
 
   class FailedTestException < Hana::Exception
     attr_accessor :path, :value
@@ -122,7 +123,7 @@ module Hana
         op_const = patch['op'].capitalize.to_sym
 
         unless Hana::Operations.const_defined?(op_const)
-          raise Hana::Exception, "bad method `#{patch['op']}`" 
+          raise Hana::InvalidOperation, "Invalid operation: `#{patch['op']}`" 
         end
 
         Hana::Operations.const_get(op_const).apply(patch, cur_doc)
