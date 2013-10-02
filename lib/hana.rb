@@ -128,8 +128,14 @@ class Hana::Patch
   end
 end
 
+# These operations take advantage of the fact that Pointer#eval returns the same
+# object (obj.object_id match) and thus any changes made to the extracted object
+# will be reflected in the original deeply nested object.
 module Hana::Operations
-  # Add an item with
+
+  # Add a value at the provided key within the provided object. This will behave
+  # differently depending on whether we're processing a hash or an array as the
+  # target destination.
   def add_op(dest_obj, key, new_value)
     if dest_obj.is_a?(Array)
       if key == '-'
@@ -158,10 +164,10 @@ module Hana::Operations
 end
 
 module Hana::Operations::Add
-  def apply(patch_info, doc)
+  def apply(patch_info, target_doc)
     path      = Hana::Pointer.parse(patch_info['path'])
     key       = path.pop
-    dest_obj  = Hana::Pointer.eval(path, doc)
+    dest_obj  = Hana::Pointer.eval(path, target_doc)
     new_value = patch_info['value']
 
     raise(MissingTargetException, patch_info['path']) unless dest_obj
@@ -177,13 +183,13 @@ module Hana::Operations::Add
 end
 
 module Hana::Operations::Move
-  def apply(ins, doc)
-    from     = Hana::Pointer.parse(ins['from'])
-    to       = Hana::Pointer.parse(ins['path'])
+  def apply(patch_data, target_doc)
+    from     = Hana::Pointer.parse(patch_data['from'])
+    to       = Hana::Pointer.parse(patch_data['path'])
     from_key = from.pop
     key      = to.pop
-    src      = Hana::Pointer.eval(from, doc)
-    dest     = Hana::Pointer.eval(to, doc)
+    src      = Hana::Pointer.eval(from, target_doc)
+    dest     = Hana::Pointer.eval(to, target_doc)
 
     obj = Hana::Operations.rm_op(src, from_key)
     Hana::Operations.add_op(dest, key, obj)
@@ -193,13 +199,13 @@ module Hana::Operations::Move
 end
 
 module Hana::Operations::Copy
-  def apply(ins, doc)
-    from     = Hana::Pointer.parse(ins['from'])
-    to       = Hana::Pointer.parse(ins['path'])
+  def apply(patch_data, target_doc)
+    from     = Hana::Pointer.parse(patch_data['from'])
+    to       = Hana::Pointer.parse(patch_data['path'])
     from_key = from.pop
     key      = to.pop
-    src      = Hana::Pointer.eval(from, doc)
-    dest     = Hana::Pointer.eval(to, doc)
+    src      = Hana::Pointer.eval(from, target_doc)
+    dest     = Hana::Pointer.eval(to, target_doc)
 
     if src.is_a?(Array)
       raise Hana::IndexError unless from_key =~ /\A\d+\Z/
@@ -214,55 +220,46 @@ module Hana::Operations::Copy
   module_function :apply
 end
 
-module Hana
-  module Operations
-    module Test
-      def apply(ins, doc)
-        expected = Pointer.eval(Pointer.parse(ins['path']), doc)
+module Hana::Operations::Test
+  # A simple test to validate the value at the expected location matches the
+  # value in the patch information.
+  def apply(patch_data, target_doc)
+    expected = Hana::Pointer.eval(Hana::Pointer.parse(patch_data['path']), target_doc)
 
-        unless expected == ins['value']
-          raise FailedTestException.new(ins['value'], ins['path'])
-        end
-      end
-
-      module_function :apply
+    unless expected == patch_data['value']
+      raise Hana::FailedTestException.new(patch_data['value'], patch_data['path'])
     end
   end
+
+  module_function :apply
 end
 
-module Hana
-  module Operations
-    module Replace
-      def apply(ins, doc)
-        list = Pointer.parse(ins['path'])
-        key  = list.pop
-        obj  = Pointer.eval(list, doc)
+module Hana::Operations::Replace
+  def apply(patch_data, target_doc)
+    list = Hana::Pointer.parse(patch_data['path'])
+    key  = list.pop
+    obj  = Hana::Pointer.eval(list, target_doc)
 
-        if Array === obj
-          raise IndexError unless key =~ /\A\d+\Z/
-          obj[key.to_i] = ins['value']
-        else
-          obj[key] = ins['value']
-        end
-      end
-
-      module_function :apply
+    if obj.is_a?(Array)
+      raise Hana::IndexError unless key =~ /\A\d+\Z/
+      obj[key.to_i] = patch_data['value']
+    else
+      obj[key] = patch_data['value']
     end
   end
+
+  module_function :apply
 end
 
-module Hana
-  module Operations
-    module Remove
-      def apply(ins, doc)
-        list = Pointer.parse(ins['path'])
-        key  = list.pop
-        obj  = Pointer.eval(list, doc)
-        Operations.rm_op(obj, key)
-      end
+module Hana::Operations::Remove
+  def apply(patch_data, target_doc)
+    list = Hana::Pointer.parse(patch_data['path'])
+    key  = list.pop
+    obj  = Hana::Pointer.eval(list, target_doc)
 
-      module_function :apply
-    end
+    Hana::Operations.rm_op(obj, key)
   end
+
+  module_function :apply
 end
 
