@@ -243,20 +243,16 @@ end
 
 module Hana
   module Operations
-    def check_index(obj, key)
-      raise ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
-      idx = key.to_i
-      raise OutOfBoundsException if (idx > obj.size || idx < 0)
-      idx
-    end
-
     # Add an item with
     def add_op(dest_obj, key, new_value)
       if dest_obj.is_a?(Array)
         if key == '-'
           dest_obj.insert(-1, new_value)
         else
-          dest_obj.insert(check_index(dest_obj, key), new_value)
+          raise ObjectOperationOnArrayException unless key =~ /\A-?\d+\Z/
+          key = key.to_i
+          raise OutOfBoundsException if (key > dest_obj.size || key < 0)
+          dest_obj.insert(key, new_value)
         end
       else
         dest_obj[key] = new_value
@@ -272,7 +268,7 @@ module Hana
       end
     end
 
-    module_function :check_index, :add_op, :rm_op
+    module_function :add_op, :rm_op
   end
 end
 
